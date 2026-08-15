@@ -15,8 +15,6 @@
       </div>
     </div>
 
-    <p v-if="notice" class="feedback" :class="noticeType">{{ notice }}</p>
-
     <div class="catalog-toolbar">
       <label class="toolbar-field">
         <span>Buscar por título</span>
@@ -54,10 +52,21 @@
         :loading="detailLoading"
         :error="detailError"
         :guest-mode="guestMode"
-        :notice="interactionNotice"
+        :current-user="currentUser"
+        :notice="detailNotice"
         :show-login-action="showLoginAction"
+        :busy-like="busy.like"
+        :busy-comment="busy.comment"
+        :busy-reply-id="busy.replyId"
+        :busy-delete-id="busy.deleteId"
+        :refresh-token="detailRefreshToken"
         @close="closeVideo"
-        @interact="handleInteractionAttempt"
+        @guest-action="handleGuestAction"
+        @like="handleToggleLike"
+        @comment="handleCreateComment"
+        @reply="handleCreateReply"
+        @delete-comment="handleDeleteComment"
+        @focus-comments="focusComments"
         @request-auth="$emit('request-auth', $event)"
       />
     </template>
@@ -65,15 +74,15 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import VideoCard from './VideoCard.vue';
 import VideoDetail from './VideoDetail.vue';
 import { getCategories, getVideoById, getVideos, getVideosByCategory } from '../services/videoService.js';
+import { createVideoComment, deleteComment, replyToComment, toggleVideoLike } from '../services/interactionService.js';
 
 const props = defineProps({
   guestMode: { type: Boolean, default: false },
-  notice: { type: String, default: '' },
-  noticeType: { type: String, default: '' },
+  currentUser: { type: Object, default: null },
 });
 
 defineEmits(['request-auth']);
@@ -89,8 +98,15 @@ const categories = ref([]);
 const allVideos = ref([]);
 const currentVideos = ref([]);
 const selectedVideo = ref(null);
-const interactionNotice = ref('');
+const detailNotice = ref('');
 const showLoginAction = ref(false);
+const detailRefreshToken = ref(0);
+const busy = reactive({
+  like: false,
+  comment: false,
+  replyId: null,
+  deleteId: null,
+});
 
 const categoryOptions = computed(() => [
   { value: 'all', label: 'Todas las categorías' },
@@ -127,7 +143,7 @@ async function loadCatalog() {
 async function openVideo(id) {
   detailLoading.value = true;
   detailError.value = '';
-  interactionNotice.value = '';
+  detailNotice.value = '';
   showLoginAction.value = false;
   selectedVideo.value = { id };
 
@@ -143,13 +159,11 @@ async function openVideo(id) {
 function closeVideo() {
   selectedVideo.value = null;
   detailError.value = '';
-  interactionNotice.value = '';
+  detailNotice.value = '';
   showLoginAction.value = false;
 }
 
 async function loadCategory(category) {
-  selectedVideo.value = null;
-
   if (category === 'all') {
     currentVideos.value = [...allVideos.value];
     return;
@@ -168,20 +182,111 @@ async function loadCategory(category) {
   }
 }
 
-function handleInteractionAttempt(type) {
-  if (props.guestMode) {
-    interactionNotice.value = 'Debes iniciar sesión para interactuar con este video.';
-    showLoginAction.value = true;
-    return;
-  }
-
-  interactionNotice.value = type === 'likes' ? 'Funcionalidad de Me gusta disponible en la Serie III.' : 'Funcionalidad de comentarios disponible en la Serie III.';
+function focusComments() {
+  detailNotice.value = '';
   showLoginAction.value = false;
+}
+
+function handleGuestAction(action) {
+  detailNotice.value = action === 'comment'
+    ? 'Debes iniciar sesión para comentar.'
+    : 'Debes iniciar sesión para dar Me gusta.';
+  showLoginAction.value = true;
+}
+
+async function refreshCurrentVideo() {
+  if (!selectedVideo.value?.id) return;
+
+  const refreshed = await getVideoById(selectedVideo.value.id);
+  selectedVideo.value = refreshed;
+}
+
+async function handleToggleLike() {
+  if (!selectedVideo.value || !props.currentUser) return;
+
+  busy.like = true;
+  detailNotice.value = '';
+  showLoginAction.value = false;
+
+  try {
+    const response = await toggleVideoLike(selectedVideo.value.id, props.currentUser.carne);
+    detailNotice.value = response?.mensaje || '';
+    await refreshCurrentVideo();
+    detailRefreshToken.value += 1;
+  } catch (error) {
+    detailNotice.value = error.message || 'No se pudo actualizar el Me gusta.';
+  } finally {
+    busy.like = false;
+  }
+}
+
+async function handleCreateComment(texto) {
+  if (!selectedVideo.value || !props.currentUser) return;
+
+  busy.comment = true;
+  detailNotice.value = '';
+
+  try {
+    const response = await createVideoComment(selectedVideo.value.id, props.currentUser.carne, texto);
+    detailNotice.value = response?.mensaje || 'Comentario publicado.';
+    await refreshCurrentVideo();
+    detailRefreshToken.value += 1;
+  } catch (error) {
+    detailNotice.value = error.message || 'No se pudo publicar el comentario.';
+  } finally {
+    busy.comment = false;
+  }
+}
+
+async function handleCreateReply(payload) {
+  if (!selectedVideo.value || !props.currentUser) return;
+
+  busy.replyId = payload.commentId;
+  detailNotice.value = '';
+
+  try {
+    const response = await replyToComment(payload.commentId, props.currentUser.carne, payload.texto);
+    detailNotice.value = response?.mensaje || 'Respuesta publicada.';
+    await refreshCurrentVideo();
+    detailRefreshToken.value += 1;
+  } catch (error) {
+    detailNotice.value = error.message || 'No se pudo publicar la respuesta.';
+  } finally {
+    busy.replyId = null;
+  }
+}
+
+async function handleDeleteComment(commentId) {
+  if (!selectedVideo.value || !props.currentUser) return;
+
+  busy.deleteId = commentId;
+  detailNotice.value = '';
+
+  try {
+    const response = await deleteComment(commentId, props.currentUser.carne);
+    detailNotice.value = response?.mensaje || 'Comentario eliminado.';
+    await refreshCurrentVideo();
+    detailRefreshToken.value += 1;
+  } catch (error) {
+    detailNotice.value = error.status === 403
+      ? 'No tienes permiso para eliminar este comentario.'
+      : error.message || 'No se pudo eliminar el comentario.';
+  } finally {
+    busy.deleteId = null;
+  }
 }
 
 watch(selectedCategory, (value) => {
   loadCategory(value);
 });
+
+watch(
+  () => props.currentUser?.carne,
+  () => {
+    detailNotice.value = '';
+    showLoginAction.value = false;
+  },
+);
 
 onMounted(loadCatalog);
 </script>

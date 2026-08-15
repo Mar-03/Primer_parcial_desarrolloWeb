@@ -24,7 +24,10 @@ export async function request(path, options = {}) {
 
   if (!response.ok) {
     const message = getApiErrorMessage(response.status, data);
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    error.payload = data;
+    throw error;
   }
 
   return data;

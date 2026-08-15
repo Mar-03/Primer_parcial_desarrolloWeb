@@ -30,48 +30,30 @@
       <CatalogView
         ref="catalogRef"
         :guest-mode="!auth.user"
+        :current-user="auth.user"
         @request-auth="openAuth"
       />
-
-      <section v-if="!auth.user && showAuthPanel" ref="authSection" class="auth-section panel">
-        <div class="tabs" role="tablist" aria-label="Navegación de autenticación">
-          <button type="button" class="tab" :class="{ active: authTab === 'login' }" @click="authTab = 'login'">
-            Iniciar sesión
-          </button>
-          <button type="button" class="tab" :class="{ active: authTab === 'register' }" @click="authTab = 'register'">
-            Registrarse
-          </button>
-        </div>
-
-        <LoginForm
-          v-if="authTab === 'login'"
-          :key="`login-${formNonce}`"
-          :loading="auth.loading"
-          :message="auth.message"
-          :message-type="auth.messageType"
-          :reset-token="auth.resetToken"
-          @submit="handleLogin"
-        />
-
-        <RegisterForm
-          v-else
-          :key="`register-${formNonce}`"
-          :loading="auth.loading"
-          :message="auth.message"
-          :message-type="auth.messageType"
-          :reset-token="auth.resetToken"
-          @submit="handleRegister"
-        />
-      </section>
     </main>
+
+    <AuthModal
+      v-if="authModalOpen"
+      :tab="authTab"
+      :loading="auth.loading"
+      :message="auth.message"
+      :message-type="auth.messageType"
+      :reset-token="auth.resetToken"
+      @close="closeAuth"
+      @switch-tab="openAuth"
+      @submit-login="handleLogin"
+      @submit-register="handleRegister"
+    />
   </div>
 </template>
 
 <script setup>
-import { nextTick, onMounted, reactive, ref } from 'vue';
+import { onMounted, reactive, ref } from 'vue';
+import AuthModal from './components/AuthModal.vue';
 import CatalogView from './components/CatalogView.vue';
-import LoginForm from './components/LoginForm.vue';
-import RegisterForm from './components/RegisterForm.vue';
 import { loginStudent, registerStudent } from './services/authService.js';
 
 const STORAGE_KEY = 'primer-parcial-auth';
@@ -82,10 +64,8 @@ const auth = reactive({
   messageType: '',
   resetToken: 0,
 });
+const authModalOpen = ref(false);
 const authTab = ref('login');
-const showAuthPanel = ref(false);
-const formNonce = ref(0);
-const authSection = ref(null);
 const catalogRef = ref(null);
 
 function loadSession() {
@@ -110,6 +90,19 @@ function clearFeedback() {
 
 function bumpResetToken() {
   auth.resetToken += 1;
+}
+
+function closeAuth() {
+  authModalOpen.value = false;
+  clearFeedback();
+}
+
+async function openAuth(target = 'login') {
+  if (auth.user) return;
+
+  clearFeedback();
+  authTab.value = target;
+  authModalOpen.value = true;
 }
 
 async function handleRegister(payload) {
@@ -140,7 +133,7 @@ async function handleLogin(payload) {
     bumpResetToken();
     auth.messageType = 'success';
     auth.message = result.message || 'Inicio de sesión exitoso.';
-    showAuthPanel.value = false;
+    authModalOpen.value = false;
   } catch (error) {
     auth.messageType = 'error';
     auth.message = error.message;
@@ -154,16 +147,7 @@ function logout() {
   localStorage.removeItem(STORAGE_KEY);
   clearFeedback();
   authTab.value = 'login';
-  showAuthPanel.value = false;
-}
-
-async function openAuth(target = 'login') {
-  clearFeedback();
-  authTab.value = target;
-  formNonce.value += 1;
-  showAuthPanel.value = true;
-  await nextTick();
-  authSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  authModalOpen.value = false;
 }
 
 function scrollToCatalog() {
