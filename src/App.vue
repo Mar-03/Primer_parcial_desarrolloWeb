@@ -1,52 +1,40 @@
 <template>
   <div class="app-shell">
-    <header class="hero">
-      <p class="eyebrow">Primer Parcial</p>
-      <h1>Plataforma educativa de videos</h1>
-      <p class="hero-copy">
-        Acceso para estudiantes con registro, inicio de sesión y sesión persistente.
-      </p>
-    </header>
+    <header class="site-header">
+      <div>
+        <p class="eyebrow">Primer Parcial</p>
+        <h1>Plataforma educativa de videos</h1>
+      </div>
 
-    <main class="card-grid">
-      <section class="panel intro-panel">
-        <h2>Bienvenido</h2>
-        <p>
-          Esta base prepara el acceso de la plataforma antes de continuar con el catálogo de videos.
-        </p>
-
-        <div v-if="auth.user" class="session-box">
-          <p class="session-label">Sesión activa</p>
+      <div v-if="auth.user" class="header-session">
+        <div>
           <strong>{{ auth.user.estudiante }}</strong>
           <span>{{ auth.user.carne }}</span>
-          <span>{{ auth.user.correo }}</span>
-          <button class="button button-secondary" type="button" @click="logout">
-            Cerrar sesión
-          </button>
         </div>
+        <button class="button button-secondary" type="button" @click="logout">Cerrar sesión</button>
+      </div>
+    </header>
 
-        <div v-else class="session-box muted">
-          <p class="session-label">Sin sesión activa</p>
-          <span>Usa el formulario para registrarte o iniciar sesión.</span>
+    <main v-if="!auth.user" class="public-layout">
+      <section class="panel intro-panel">
+        <h2>Acceso de estudiantes</h2>
+        <p>
+          Puedes navegar y reproducir los videos sin iniciar sesión. Regístrate o inicia sesión para dar Me gusta,
+          comentar y responder.
+        </p>
+
+        <div class="session-box muted">
+          <p class="session-label">Sesión pública</p>
+          <span>Sin autenticación activa.</span>
         </div>
       </section>
 
       <section class="panel auth-panel">
         <div class="tabs" role="tablist" aria-label="Navegación de autenticación">
-          <button
-            type="button"
-            class="tab"
-            :class="{ active: view === 'login' }"
-            @click="view = 'login'"
-          >
+          <button type="button" class="tab" :class="{ active: view === 'login' }" @click="view = 'login'">
             Login
           </button>
-          <button
-            type="button"
-            class="tab"
-            :class="{ active: view === 'register' }"
-            @click="view = 'register'"
-          >
+          <button type="button" class="tab" :class="{ active: view === 'register' }" @click="view = 'register'">
             Registro
           </button>
         </div>
@@ -67,12 +55,19 @@
           @submit="handleRegister"
         />
       </section>
+
+      <CatalogView guest-mode compact />
+    </main>
+
+    <main v-else class="authenticated-layout">
+      <CatalogView :guest-mode="false" :notice="auth.message" :notice-type="auth.messageType" />
     </main>
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { reactive, ref } from 'vue';
+import CatalogView from './components/CatalogView.vue';
 import LoginForm from './components/LoginForm.vue';
 import RegisterForm from './components/RegisterForm.vue';
 import { loginStudent, registerStudent } from './services/authService';
