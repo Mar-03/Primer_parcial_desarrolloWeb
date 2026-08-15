@@ -4,6 +4,7 @@
     <input
       :name="name"
       :type="type"
+      :autocomplete="autocomplete"
       :placeholder="placeholder"
       :value="modelValue"
       @input="$emit('update:modelValue', $event.target.value)"
@@ -19,6 +20,7 @@ defineProps({
   label: { type: String, required: true },
   name: { type: String, required: true },
   type: { type: String, default: 'text' },
+  autocomplete: { type: String, default: 'off' },
   placeholder: { type: String, default: '' },
   error: { type: String, default: '' },
 });

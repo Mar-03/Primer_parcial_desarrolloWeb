@@ -1,5 +1,5 @@
 <template>
-  <form class="auth-form" @submit.prevent="submitForm">
+  <form class="auth-form" autocomplete="off" @submit.prevent="submitForm">
     <h2>Registro de estudiante</h2>
     <p class="subtle">Completa los datos antes de enviar la solicitud.</p>
 
@@ -17,14 +17,15 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue';
+import { onMounted, reactive, watch } from 'vue';
 import FormField from './FormField.vue';
 import { validateRegistration } from '../services/validation';
 
-defineProps({
+const props = defineProps({
   loading: Boolean,
   message: String,
   messageType: String,
+  resetToken: { type: Number, default: 0 },
 });
 
 const emit = defineEmits(['submit']);
@@ -43,6 +44,17 @@ const errors = reactive({
   password: '',
 });
 
+function resetForm() {
+  form.carne = '';
+  form.estudiante = '';
+  form.correo = '';
+  form.password = '';
+  errors.carne = '';
+  errors.estudiante = '';
+  errors.correo = '';
+  errors.password = '';
+}
+
 function submitForm() {
   const nextErrors = validateRegistration(form);
   errors.carne = nextErrors.carne || '';
@@ -54,4 +66,13 @@ function submitForm() {
 
   emit('submit', { ...form });
 }
+
+watch(
+  () => props.resetToken,
+  () => {
+    resetForm();
+  },
+);
+
+onMounted(resetForm);
 </script>

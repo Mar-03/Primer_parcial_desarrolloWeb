@@ -1,5 +1,5 @@
 <template>
-  <article class="video-card" :class="{ active }">
+  <article class="video-card">
     <button type="button" class="video-card-button" @click="$emit('select')">
       <img :src="video.poster" :alt="video.titulo" class="video-poster" />
       <div class="video-card-body">
@@ -9,6 +9,7 @@
         </div>
         <h3>{{ video.titulo }}</h3>
         <p>{{ video.descripcion }}</p>
+        <span class="card-link">Ver video</span>
       </div>
     </button>
   </article>
@@ -17,7 +18,6 @@
 <script setup>
 defineProps({
   video: { type: Object, required: true },
-  active: { type: Boolean, default: false },
 });
 
 defineEmits(['select']);

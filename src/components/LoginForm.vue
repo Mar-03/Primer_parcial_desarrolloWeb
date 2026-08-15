@@ -1,5 +1,5 @@
 <template>
-  <form class="auth-form" @submit.prevent="submitForm">
+  <form class="auth-form" autocomplete="off" @submit.prevent="submitForm">
     <h2>Iniciar sesión</h2>
     <p class="subtle">Usa tu carné o correo y tu PIN numérico.</p>
 
@@ -7,6 +7,7 @@
       v-model="form.usuario"
       label="Usuario"
       name="usuario"
+      autocomplete="off"
       placeholder="1890-20-11489 o correo"
       :error="errors.usuario"
     />
@@ -16,6 +17,7 @@
       label="Contraseña / PIN"
       name="password"
       type="password"
+      autocomplete="off"
       placeholder="1234"
       :error="errors.password"
     />
@@ -29,7 +31,7 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue';
+import { onMounted, reactive, watch } from 'vue';
 import FormField from './FormField.vue';
 import { validateLogin } from '../services/validation';
 
@@ -37,6 +39,7 @@ const props = defineProps({
   loading: Boolean,
   message: String,
   messageType: String,
+  resetToken: { type: Number, default: 0 },
 });
 
 const emit = defineEmits(['submit']);
@@ -51,6 +54,13 @@ const errors = reactive({
   password: '',
 });
 
+function resetForm() {
+  form.usuario = '';
+  form.password = '';
+  errors.usuario = '';
+  errors.password = '';
+}
+
 function submitForm() {
   const nextErrors = validateLogin(form);
   errors.usuario = nextErrors.usuario || '';
@@ -60,4 +70,13 @@ function submitForm() {
 
   emit('submit', { ...form });
 }
+
+watch(
+  () => props.resetToken,
+  () => {
+    resetForm();
+  },
+);
+
+onMounted(resetForm);
 </script>
